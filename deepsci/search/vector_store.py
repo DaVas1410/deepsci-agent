@@ -9,6 +9,13 @@ from sentence_transformers import SentenceTransformer
 from typing import List, Dict, Any, Optional
 from pathlib import Path
 import hashlib
+import os
+import warnings
+
+# Suppress HuggingFace warnings
+os.environ['HF_HUB_DISABLE_SYMLINKS_WARNING'] = '1'
+os.environ['TOKENIZERS_PARALLELISM'] = 'false'
+warnings.filterwarnings('ignore', category=UserWarning, module='huggingface_hub')
 
 
 class VectorStore:
@@ -86,14 +93,14 @@ class VectorStore:
             # Generate embedding
             embedding = self.model.encode(text).tolist()
             
-            # Prepare metadata
+            # Prepare metadata (ensure all values are ChromaDB compatible)
             metadata = {
                 'arxiv_id': paper_id,
                 'title': paper.get('title', '')[:500],  # Limit length
                 'authors': ', '.join(paper.get('authors', [])[:5])[:300],
                 'year': str(paper.get('year', '')),
                 'categories': ', '.join(paper.get('categories', [])[:5])[:200],
-                'citation_count': paper.get('citation_count', 0),
+                'citation_count': int(paper.get('citation_count', 0)),  # Ensure int
                 'url': paper.get('url', '')
             }
             
@@ -153,14 +160,15 @@ class VectorStore:
             papers = []
             if results['ids'] and len(results['ids']) > 0:
                 for i in range(len(results['ids'][0])):
+                    metadata = results['metadatas'][0][i]
                     paper = {
-                        'id': results['metadatas'][0][i].get('arxiv_id', ''),
-                        'title': results['metadatas'][0][i].get('title', ''),
-                        'authors': results['metadatas'][0][i].get('authors', '').split(', '),
-                        'year': results['metadatas'][0][i].get('year', ''),
-                        'categories': results['metadatas'][0][i].get('categories', '').split(', '),
-                        'citation_count': results['metadatas'][0][i].get('citation_count', 0),
-                        'url': results['metadatas'][0][i].get('url', ''),
+                        'id': metadata.get('arxiv_id', ''),
+                        'title': metadata.get('title', ''),
+                        'authors': metadata.get('authors', '').split(', ') if metadata.get('authors') else [],
+                        'year': metadata.get('year', ''),
+                        'categories': metadata.get('categories', '').split(', ') if metadata.get('categories') else [],
+                        'citation_count': int(metadata.get('citation_count', 0)),  # Ensure int
+                        'url': metadata.get('url', ''),
                         'abstract': results['documents'][0][i] if results['documents'] else '',
                         'similarity': 1 - results['distances'][0][i],  # Convert distance to similarity
                         'source': 'library'
@@ -208,16 +216,17 @@ class VectorStore:
             papers = []
             if results['ids'] and len(results['ids']) > 0:
                 for i in range(len(results['ids'][0])):
-                    arxiv_id = results['metadatas'][0][i].get('arxiv_id', '')
+                    metadata = results['metadatas'][0][i]
+                    arxiv_id = metadata.get('arxiv_id', '')
                     if arxiv_id != paper_id:  # Skip the original paper
                         paper = {
                             'id': arxiv_id,
-                            'title': results['metadatas'][0][i].get('title', ''),
-                            'authors': results['metadatas'][0][i].get('authors', '').split(', '),
-                            'year': results['metadatas'][0][i].get('year', ''),
-                            'categories': results['metadatas'][0][i].get('categories', '').split(', '),
-                            'citation_count': results['metadatas'][0][i].get('citation_count', 0),
-                            'url': results['metadatas'][0][i].get('url', ''),
+                            'title': metadata.get('title', ''),
+                            'authors': metadata.get('authors', '').split(', ') if metadata.get('authors') else [],
+                            'year': metadata.get('year', ''),
+                            'categories': metadata.get('categories', '').split(', ') if metadata.get('categories') else [],
+                            'citation_count': int(metadata.get('citation_count', 0)),  # Ensure int
+                            'url': metadata.get('url', ''),
                             'abstract': results['documents'][0][i] if results['documents'] else '',
                             'similarity': 1 - results['distances'][0][i],
                             'source': 'library'

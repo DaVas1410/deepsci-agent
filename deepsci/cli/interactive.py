@@ -469,10 +469,22 @@ Your AI-powered physics research assistant. I can help you:
             
             if papers:
                 self.console.print(f"[green]✓[/green] Found {len(papers)} relevant papers")
-                # Convert to compatible format for display
-                self.current_papers = [
-                    type('obj', (object,), p)() for p in papers
-                ]
+                # Convert dict to Paper-like objects
+                self.current_papers = []
+                for p in papers:
+                    paper_obj = Paper(
+                        id=p.get('id', ''),
+                        title=p.get('title', ''),
+                        authors=p.get('authors', []),
+                        published=p.get('year', ''),
+                        summary=p.get('abstract', ''),
+                        pdf_url=p.get('url', ''),
+                        categories=p.get('categories', [])
+                    )
+                    # Add citation count if available
+                    paper_obj.citation_count = int(p.get('citation_count', 0))
+                    paper_obj.similarity = p.get('similarity', 0)
+                    self.current_papers.append(paper_obj)
                 self.display_papers(self.current_papers)
             else:
                 self.console.print("[yellow]No matching papers found in your library[/yellow]")
@@ -519,9 +531,22 @@ Your AI-powered physics research assistant. I can help you:
             
             if similar_papers:
                 self.console.print(f"[green]✓[/green] Found {len(similar_papers)} similar papers")
-                self.current_papers = [
-                    type('obj', (object,), p)() for p in similar_papers
-                ]
+                # Convert dict to Paper-like objects
+                self.current_papers = []
+                for p in similar_papers:
+                    paper_obj = Paper(
+                        id=p.get('id', ''),
+                        title=p.get('title', ''),
+                        authors=p.get('authors', []),
+                        published=p.get('year', ''),
+                        summary=p.get('abstract', ''),
+                        pdf_url=p.get('url', ''),
+                        categories=p.get('categories', [])
+                    )
+                    # Add citation count if available
+                    paper_obj.citation_count = int(p.get('citation_count', 0))
+                    paper_obj.similarity = p.get('similarity', 0)
+                    self.current_papers.append(paper_obj)
                 self.display_papers(self.current_papers)
             else:
                 self.console.print("[yellow]No similar papers found in library[/yellow]")
