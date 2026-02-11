@@ -136,6 +136,12 @@ Your AI-powered physics research assistant. I can help you:
             match = re.match(r'^summarize\s+(?:paper\s+)?(\d+)', lower_input)
             return 'summarize', match.group(1)
         
+        # Citations toggle
+        if 'citations on' in lower_input:
+            return 'citations', 'on'
+        if 'citations off' in lower_input:
+            return 'citations', 'off'
+        
         # Help patterns
         if lower_input in ['help', 'help me', 'what can you do', 'commands']:
             return 'help', ''
@@ -446,6 +452,14 @@ Your AI-powered physics research assistant. I can help you:
                         self.console.print("[yellow]No papers to summarize. Search for papers first.[/yellow]")
                     else:
                         self.handle_summarize(args)
+                
+                elif cmd == 'citations':
+                    if args == 'on':
+                        self.fetch_citations = True
+                        self.console.print("[green]✓[/green] Citation fetching enabled")
+                    elif args == 'off':
+                        self.fetch_citations = False
+                        self.console.print("[yellow]⊘[/yellow] Citation fetching disabled (faster searches)")
                 
                 elif cmd == 'unknown':
                     self.console.print("[yellow]I didn't understand that. Type 'help' for available commands.[/yellow]")
