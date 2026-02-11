@@ -110,9 +110,10 @@ def ask(question):
 
 
 @cli.command()
-def interactive():
+@click.option('--no-ai', is_flag=True, help='Disable AI features for faster startup')
+def interactive(no_ai):
     """Start interactive chatbot mode"""
-    start_chat()
+    start_chat(use_llm=not no_ai)
 
 
 if __name__ == '__main__':

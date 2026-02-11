@@ -6,44 +6,82 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.markdown import Markdown
 from rich.table import Table
-from rich.prompt import Prompt
+from rich.prompt import Prompt, Confirm
 from rich import box
 from datetime import datetime
 from typing import List, Optional
 import re
 
 from deepsci.sources.arxiv_client import ArxivClient, Paper
+from deepsci.llm.local_llm import LocalLLM, ModelDownloader
 from deepsci import __version__
 
 
 class DeepSciChat:
     """Interactive chatbot interface for research assistance"""
     
-    def __init__(self):
+    def __init__(self, use_llm: bool = True):
         self.console = Console()
         self.arxiv_client = ArxivClient(max_results=10)
         self.conversation_history = []
         self.current_papers = []
+        self.llm = None
+        self.use_llm = use_llm
         
+        # Initialize LLM if requested
+        if self.use_llm:
+            self._initialize_llm()
+        
+    def _initialize_llm(self):
+        """Initialize the local LLM"""
+        try:
+            self.console.print("\n[cyan]Initializing AI assistant...[/cyan]")
+            
+            # Check if model exists
+            downloader = ModelDownloader()
+            model_path = downloader.models_dir / "tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf"
+            
+            if not model_path.exists():
+                self.console.print("[yellow]First time setup: Downloading AI model (669MB)[/yellow]")
+                proceed = Confirm.ask("Download TinyLlama model?", default=True)
+                
+                if not proceed:
+                    self.console.print("[yellow]Continuing without AI features...[/yellow]")
+                    self.use_llm = False
+                    return
+            
+            self.llm = LocalLLM()
+            self.console.print("[green]✓[/green] AI assistant ready!\n")
+            
+        except Exception as e:
+            self.console.print(f"[yellow]Warning: Could not load AI model: {str(e)}[/yellow]")
+            self.console.print("[yellow]Continuing without AI features...[/yellow]")
+            self.use_llm = False
+    
     def show_welcome(self):
         """Display welcome message"""
+        ai_status = "✓ AI Enabled" if (self.use_llm and self.llm) else "⊘ AI Disabled"
+        
         welcome_text = f"""
 # 🔬 Welcome to DeepSci Agent v{__version__}
 
 Your AI-powered physics research assistant. I can help you:
 
 • **Search** for papers across arXiv, PubMed, and more
-• **Summarize** research papers and extract key findings  
+• **Summarize** research papers and extract key findings {' 🤖' if self.use_llm else ' (requires AI)'}
 • **Compare** multiple papers side-by-side
 • **Answer** questions about physics topics
 
 **Quick Commands:**
 - `search <query>` - Search for papers
 - `show <number>` - Show details of a paper from results
+- `summarize <number>` - Get AI summary of a paper {' 🤖' if self.use_llm else ' (requires AI)'}
 - `help` - Show all commands
 - `exit` - Exit the chat
 
 **Just type naturally!** Try: *"find papers on quantum entanglement"*
+
+**Status:** {ai_status}
         """
         self.console.print(Panel(
             Markdown(welcome_text),
@@ -84,6 +122,11 @@ Your AI-powered physics research assistant. I can help you:
         if re.match(r'^show\s+(?:paper\s+)?(\d+)', lower_input):
             match = re.match(r'^show\s+(?:paper\s+)?(\d+)', lower_input)
             return 'show', match.group(1)
+        
+        # Summarize patterns
+        if re.match(r'^summarize\s+(?:paper\s+)?(\d+)', lower_input):
+            match = re.match(r'^summarize\s+(?:paper\s+)?(\d+)', lower_input)
+            return 'summarize', match.group(1)
         
         # Help patterns
         if lower_input in ['help', 'help me', 'what can you do', 'commands']:
@@ -176,11 +219,11 @@ Your AI-powered physics research assistant. I can help you:
 ## Explicit Commands
 - `search <query>` - Search for papers
 - `show <number>` - Show details of paper from results
+- `summarize <number>` - Get AI summary of a paper
 - `help` - Show this help message
 - `exit` - Exit the chat
 
 ## Coming Soon
-- `summarize <paper_id>` - Get AI summary of a paper
 - `compare <id1> <id2>` - Compare two papers
 - `ask <question>` - Ask questions about papers
         """
@@ -217,6 +260,55 @@ Your AI-powered physics research assistant. I can help you:
         except ValueError:
             self.console.print(f"[red]Error:[/red] Invalid paper number")
     
+    def handle_summarize(self, paper_num: str):
+        """Handle summarize paper command"""
+        if not self.use_llm or not self.llm:
+            self.console.print("[yellow]AI features are not available. Enable AI to use summarization.[/yellow]")
+            return
+        
+        try:
+            num = int(paper_num)
+            if num < 1 or num > len(self.current_papers):
+                self.console.print(f"[red]Error:[/red] Paper number must be between 1 and {len(self.current_papers)}")
+                return
+            
+            paper = self.current_papers[num - 1]
+            
+            self.console.print(f"\n[cyan]🤖 Generating AI summary for:[/cyan] {paper.title}\n")
+            
+            with self.console.status("[bold cyan]AI is analyzing the paper...", spinner="dots"):
+                summary = self.llm.summarize_abstract(paper.title, paper.abstract)
+                key_points = self.llm.extract_key_points(paper.title, paper.abstract)
+            
+            summary_text = f"""
+## {paper.title}
+
+**Authors:** {', '.join(paper.authors[:5])}{'...' if len(paper.authors) > 5 else ''}
+
+**Published:** {paper.published.strftime('%B %Y')}
+
+### 🤖 AI Summary
+{summary}
+
+### 🔑 Key Points
+{key_points}
+
+---
+*Summary generated by local AI (TinyLlama)*
+            """
+            
+            self.console.print(Panel(
+                Markdown(summary_text),
+                title="AI-Powered Summary",
+                border_style="magenta",
+                box=box.ROUNDED
+            ))
+            
+        except ValueError:
+            self.console.print(f"[red]Error:[/red] Invalid paper number")
+        except Exception as e:
+            self.console.print(f"[red]Error generating summary:[/red] {str(e)}")
+    
     def run(self):
         """Main chat loop"""
         self.show_welcome()
@@ -251,6 +343,12 @@ Your AI-powered physics research assistant. I can help you:
                     else:
                         self.handle_show(args)
                 
+                elif cmd == 'summarize':
+                    if not self.current_papers:
+                        self.console.print("[yellow]No papers to summarize. Search for papers first.[/yellow]")
+                    else:
+                        self.handle_summarize(args)
+                
                 elif cmd == 'unknown':
                     self.console.print("[yellow]I didn't understand that. Type 'help' for available commands.[/yellow]")
                 
@@ -263,7 +361,7 @@ Your AI-powered physics research assistant. I can help you:
                 self.console.print(f"\n[red]Error:[/red] {str(e)}")
 
 
-def start_chat():
+def start_chat(use_llm: bool = True):
     """Start the interactive chat interface"""
-    chat = DeepSciChat()
+    chat = DeepSciChat(use_llm=use_llm)
     chat.run()

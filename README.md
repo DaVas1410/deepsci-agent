@@ -6,15 +6,14 @@ A CLI-based research agent for deep literature research on physics topics using 
 
 DeepSci Agent is an interactive command-line tool that helps researchers explore and synthesize physics literature from multiple sources including arXiv, PubMed, Google Scholar, academic journals, books, and forums. It uses local TinyML models for AI-powered research assistance without API costs.
 
-## Features (Planned)
+## Features
 
-- 🔍 **Multi-source search**: Query arXiv, PubMed, Google Scholar, journals, books, and forums
-- 🤖 **Local AI**: Uses TinyML models (Llama-based) for offline research assistance
-- 📚 **Semantic search**: Vector database for intelligent paper discovery
-- 💬 **Interactive CLI**: Terminal interface for natural research workflows
-- 📊 **Synthesis**: Automatic summarization and comparison of research papers
-- 🔗 **Citation tracking**: Build and explore citation graphs
-- 💾 **Session management**: Save and resume research sessions
+- 🔍 **Multi-source search**: Query arXiv (PubMed, Google Scholar coming soon)
+- 💬 **Interactive chatbot**: Natural language interface in your terminal
+- 🤖 **Local AI**: Uses TinyML models for offline research assistance (coming soon)
+- 📚 **Semantic search**: Vector database for intelligent paper discovery (coming soon)
+- 📊 **Paper details**: View abstracts, authors, and metadata
+- 🔗 **Citation tracking**: Build and explore citation graphs (coming soon)
 
 ## Installation
 
