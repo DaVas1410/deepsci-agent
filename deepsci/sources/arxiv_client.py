@@ -21,12 +21,16 @@ class Paper:
     url: str
     pdf_url: str
     categories: List[str]
+    citation_count: int = 0
+    influential_citations: int = 0
+    source: str = "arxiv"
     
     def __str__(self) -> str:
         authors_str = ", ".join(self.authors[:3])
         if len(self.authors) > 3:
             authors_str += f" et al. ({len(self.authors)} authors)"
-        return f"{self.title}\n{authors_str}\n{self.published.year} | {self.url}"
+        citations = f" | {self.citation_count} citations" if self.citation_count > 0 else ""
+        return f"{self.title}\n{authors_str}\n{self.published.year}{citations} | {self.url}"
 
 
 class ArxivClient:
@@ -61,7 +65,8 @@ class ArxivClient:
         query: str,
         max_results: Optional[int] = None,
         sort_by: arxiv.SortCriterion = arxiv.SortCriterion.Relevance,
-        categories: Optional[List[str]] = None
+        categories: Optional[List[str]] = None,
+        fetch_citations: bool = False
     ) -> List[Paper]:
         """
         Search arXiv for papers matching the query
@@ -71,6 +76,7 @@ class ArxivClient:
             max_results: Maximum number of results to return
             sort_by: Sort criterion (Relevance, LastUpdatedDate, SubmittedDate)
             categories: Filter by arXiv categories (e.g., ['physics.quant-ph'])
+            fetch_citations: Whether to fetch citation counts (slower)
         
         Returns:
             List of Paper objects
@@ -104,7 +110,8 @@ class ArxivClient:
                     updated=result.updated,
                     url=result.entry_id,
                     pdf_url=result.pdf_url,
-                    categories=result.categories
+                    categories=result.categories,
+                    source="arxiv"
                 )
                 papers.append(paper)
         except Exception as e:
@@ -115,6 +122,36 @@ class ArxivClient:
                     "The system will automatically retry with delays."
                 )
             raise
+        
+        # Fetch citations if requested
+        if fetch_citations and papers:
+            papers = self._enrich_with_citations(papers)
+        
+        return papers
+    
+    def _enrich_with_citations(self, papers: List[Paper]) -> List[Paper]:
+        """
+        Enrich papers with citation data from Semantic Scholar
+        
+        Args:
+            papers: List of Paper objects
+            
+        Returns:
+            Papers with citation counts added
+        """
+        from deepsci.sources.citation_client import CitationClient
+        
+        citation_client = CitationClient()
+        
+        for paper in papers:
+            try:
+                metrics = citation_client.get_citations_by_arxiv_id(paper.id)
+                if metrics:
+                    paper.citation_count = metrics['citation_count']
+                    paper.influential_citations = metrics['influential_citations']
+            except:
+                # Silently continue if citation lookup fails
+                pass
         
         return papers
     
