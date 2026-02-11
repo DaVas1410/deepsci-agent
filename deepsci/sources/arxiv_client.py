@@ -3,6 +3,7 @@ arXiv API client for searching and retrieving physics papers
 """
 
 import arxiv
+import time
 from typing import List, Dict, Any, Optional
 from dataclasses import dataclass
 from datetime import datetime
@@ -29,11 +30,31 @@ class Paper:
 
 
 class ArxivClient:
-    """Client for interacting with arXiv API"""
+    """Client for interacting with arXiv API with rate limiting"""
     
-    def __init__(self, max_results: int = 10):
+    def __init__(self, max_results: int = 10, delay_seconds: float = 3.0):
+        """
+        Initialize arXiv client
+        
+        Args:
+            max_results: Default maximum results per query
+            delay_seconds: Delay between requests (arXiv recommends 3+ seconds)
+        """
         self.max_results = max_results
-        self.client = arxiv.Client()
+        self.delay_seconds = delay_seconds
+        self.client = arxiv.Client(
+            page_size=100,
+            delay_seconds=delay_seconds,
+            num_retries=3
+        )
+        self.last_request_time = 0
+    
+    def _wait_for_rate_limit(self):
+        """Ensure we don't exceed arXiv's rate limit"""
+        elapsed = time.time() - self.last_request_time
+        if elapsed < self.delay_seconds:
+            time.sleep(self.delay_seconds - elapsed)
+        self.last_request_time = time.time()
     
     def search(
         self,
@@ -62,6 +83,9 @@ class ArxivClient:
             cat_query = " OR ".join([f"cat:{cat}" for cat in categories])
             query = f"({query}) AND ({cat_query})"
         
+        # Wait to respect rate limit
+        self._wait_for_rate_limit()
+        
         search = arxiv.Search(
             query=query,
             max_results=max_results,
@@ -69,19 +93,28 @@ class ArxivClient:
         )
         
         papers = []
-        for result in self.client.results(search):
-            paper = Paper(
-                id=result.entry_id.split('/')[-1],
-                title=result.title,
-                authors=[author.name for author in result.authors],
-                abstract=result.summary,
-                published=result.published,
-                updated=result.updated,
-                url=result.entry_id,
-                pdf_url=result.pdf_url,
-                categories=result.categories
-            )
-            papers.append(paper)
+        try:
+            for result in self.client.results(search):
+                paper = Paper(
+                    id=result.entry_id.split('/')[-1],
+                    title=result.title,
+                    authors=[author.name for author in result.authors],
+                    abstract=result.summary,
+                    published=result.published,
+                    updated=result.updated,
+                    url=result.entry_id,
+                    pdf_url=result.pdf_url,
+                    categories=result.categories
+                )
+                papers.append(paper)
+        except Exception as e:
+            # Re-raise with more helpful message
+            if "429" in str(e):
+                raise Exception(
+                    "arXiv rate limit exceeded. Please wait a moment and try again. "
+                    "The system will automatically retry with delays."
+                )
+            raise
         
         return papers
     
@@ -97,6 +130,9 @@ class ArxivClient:
         """
         # Clean up paper ID
         paper_id = paper_id.replace('arxiv:', '').replace('arXiv:', '')
+        
+        # Wait to respect rate limit
+        self._wait_for_rate_limit()
         
         search = arxiv.Search(id_list=[paper_id])
         
@@ -115,6 +151,12 @@ class ArxivClient:
             )
         except StopIteration:
             return None
+        except Exception as e:
+            if "429" in str(e):
+                raise Exception(
+                    "arXiv rate limit exceeded. Please wait a moment and try again."
+                )
+            raise
     
     def download_pdf(self, paper: Paper, directory: str = "./downloads") -> str:
         """
@@ -130,15 +172,25 @@ class ArxivClient:
         import os
         os.makedirs(directory, exist_ok=True)
         
+        # Wait to respect rate limit
+        self._wait_for_rate_limit()
+        
         # Create a safe filename
         safe_title = "".join(c for c in paper.title if c.isalnum() or c in (' ', '-', '_')).strip()
         safe_title = safe_title[:100]  # Limit length
         filename = f"{paper.id}_{safe_title}.pdf"
         filepath = os.path.join(directory, filename)
         
-        # Download using arxiv library
-        search = arxiv.Search(id_list=[paper.id])
-        result = next(self.client.results(search))
-        result.download_pdf(dirpath=directory, filename=filename)
-        
-        return filepath
+        try:
+            # Download using arxiv library
+            search = arxiv.Search(id_list=[paper.id])
+            result = next(self.client.results(search))
+            result.download_pdf(dirpath=directory, filename=filename)
+            
+            return filepath
+        except Exception as e:
+            if "429" in str(e):
+                raise Exception(
+                    "arXiv rate limit exceeded. Please wait and try again."
+                )
+            raise

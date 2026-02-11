@@ -244,7 +244,14 @@ Your AI-powered physics research assistant. I can help you:
             self.display_papers(papers)
             
         except Exception as e:
-            self.console.print(f"[red]Error:[/red] {str(e)}")
+            error_msg = str(e)
+            if "429" in error_msg or "rate limit" in error_msg.lower():
+                self.console.print("\n[yellow]⚠️  arXiv Rate Limit Warning[/yellow]")
+                self.console.print("[dim]arXiv limits requests to prevent server overload.[/dim]")
+                self.console.print("[dim]The system will automatically wait 3 seconds between requests.[/dim]")
+                self.console.print("\n[cyan]💡 Tip:[/cyan] Wait 10 seconds and try again.")
+            else:
+                self.console.print(f"[red]Error:[/red] {error_msg}")
     
     def handle_show(self, paper_num: str):
         """Handle show paper details command"""
