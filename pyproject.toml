@@ -1,0 +1,70 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "deepsci-agent"
+version = "0.1.0"
+description = "AI-powered physics research assistant with CLI interface"
+authors = [{name = "DaVas1410", email = "sedigraph7@gmail.com"}]
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+keywords = ["research", "physics", "ai", "cli", "arxiv", "papers"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering :: Physics",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+
+dependencies = [
+    "click>=8.1.0",
+    "rich>=13.0.0",
+    "python-dotenv>=1.0.0",
+    "pydantic>=2.0.0",
+    "tqdm>=4.66.0",
+    "llama-cpp-python>=0.2.0",
+    "sentence-transformers>=2.2.0",
+    "chromadb>=0.4.0",
+    "arxiv>=2.0.0",
+    "biopython>=1.81",
+    "scholarly>=1.7.0",
+    "requests>=2.31.0",
+    "beautifulsoup4>=4.12.0",
+    "lxml>=5.0.0",
+    "PyMuPDF>=1.23.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.0",
+    "pytest-cov>=4.1.0",
+    "black>=23.0.0",
+    "flake8>=6.1.0",
+    "mypy>=1.7.0",
+]
+
+[project.scripts]
+deepsci = "deepsci.cli.main:cli"
+
+[project.urls]
+Homepage = "https://github.com/DaVas1410/deepsci-agent"
+Repository = "https://github.com/DaVas1410/deepsci-agent"
+Issues = "https://github.com/DaVas1410/deepsci-agent/issues"
+
+[tool.setuptools]
+packages = ["deepsci", "deepsci.cli", "deepsci.sources", "deepsci.llm", "deepsci.search", "deepsci.agent", "deepsci.utils"]
+
+[tool.black]
+line-length = 100
+target-version = ['py310']
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_configs = true

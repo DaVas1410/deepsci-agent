@@ -1,0 +1,31 @@
+# Core dependencies
+click>=8.1.0
+rich>=13.0.0
+python-dotenv>=1.0.0
+pydantic>=2.0.0
+tqdm>=4.66.0
+
+# LLM and embeddings
+llama-cpp-python>=0.2.0
+sentence-transformers>=2.2.0
+
+# Vector database
+chromadb>=0.4.0
+
+# Data sources
+arxiv>=2.0.0
+biopython>=1.81
+scholarly>=1.7.0
+requests>=2.31.0
+beautifulsoup4>=4.12.0
+lxml>=5.0.0
+
+# PDF processing
+PyMuPDF>=1.23.0
+
+# Development dependencies
+pytest>=7.4.0
+pytest-cov>=4.1.0
+black>=23.0.0
+flake8>=6.1.0
+mypy>=1.7.0
