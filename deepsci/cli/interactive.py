@@ -14,6 +14,8 @@ import re
 
 from deepsci.sources.arxiv_client import ArxivClient, Paper
 from deepsci.sources.citation_client import CitationClient
+from deepsci.sources.scholar_client import ScholarClient
+from deepsci.sources.pdf_processor import PDFProcessor
 from deepsci.llm.local_llm import LocalLLM, ModelDownloader
 from deepsci.search.vector_store import VectorStore
 from deepsci import __version__
@@ -26,6 +28,8 @@ class DeepSciChat:
         self.console = Console()
         self.arxiv_client = ArxivClient(max_results=10)
         self.citation_client = CitationClient()
+        self.scholar_client = ScholarClient()
+        self.pdf_processor = PDFProcessor()
         self.vector_store = None  # Initialize lazily on first use
         self.conversation_history = []
         self.current_papers = []
@@ -84,13 +88,19 @@ class DeepSciChat:
 Your AI-powered physics research assistant. I can help you:
 
 • **Search** arXiv for physics papers with citation metrics
+• **Compare** multiple papers side-by-side with AI analysis {' 🤖' if self.use_llm else ' (requires AI)'}
 • **Summarize** research papers and extract key findings {' 🤖' if self.use_llm else ' (requires AI)'}
 • **Rank** papers by citation impact and influence
+• **Analyze** full PDF text, not just abstracts
 • **Answer** questions about physics topics
 
 **Quick Commands:**
 - `search <query>` - Search arXiv with citation rankings
 - `show <number>` - Show details of a paper from results
+- `compare <numbers>` - Compare papers (e.g., "compare 1 2 3") {' 🤖' if self.use_llm else ' (requires AI)'}
+- `download <number>` - Download PDF for offline reading
+- `fulltext <number>` - Extract and view full PDF text
+- `search pdf <number> <query>` - Search within a PDF
 - `save <numbers>` - Save papers to your library (e.g., "save 1 2 3")
 - `library search <query>` - Semantic search in your saved papers
 - `similar to <number>` - Find papers similar to one from results
@@ -103,7 +113,7 @@ Your AI-powered physics research assistant. I can help you:
 
 **Status:** {ai_status} | Citations: {'✓ Enabled' if self.fetch_citations else '⊘ Disabled'}
 
-**💡 Tip:** Build your personal research library with semantic search!
+**💡 Tip:** Download PDFs for full-text analysis beyond abstracts!
         """
         self.console.print(Panel(
             Markdown(welcome_text),
@@ -163,6 +173,26 @@ Your AI-powered physics research assistant. I can help you:
         if re.match(r'^similar\s+(?:to\s+)?(\d+)', lower_input):
             match = re.match(r'^similar\s+(?:to\s+)?(\d+)', lower_input)
             return 'similar', match.group(1)
+        
+        # Compare papers
+        if re.match(r'^compare\s+([\d\s]+)', lower_input):
+            match = re.match(r'^compare\s+([\d\s]+)', lower_input)
+            return 'compare', match.group(1)
+        
+        # PDF download
+        if re.match(r'^download\s+(?:pdf\s+)?(\d+)', lower_input):
+            match = re.match(r'^download\s+(?:pdf\s+)?(\d+)', lower_input)
+            return 'download_pdf', match.group(1)
+        
+        # PDF full text
+        if re.match(r'^fulltext\s+(\d+)', lower_input):
+            match = re.match(r'^fulltext\s+(\d+)', lower_input)
+            return 'fulltext', match.group(1)
+        
+        # Search in PDF
+        if re.match(r'^search pdf\s+(\d+)\s+(.+)', lower_input):
+            match = re.match(r'^search pdf\s+(\d+)\s+(.+)', lower_input)
+            return 'search_pdf', f"{match.group(1)}|{match.group(2)}"
         
         # Library stats
         if 'library stats' in lower_input or 'library status' in lower_input:
@@ -284,16 +314,29 @@ Your AI-powered physics research assistant. I can help you:
 - *"search for dark matter research"*
 - *"what about string theory"*
 
-## Explicit Commands
-- `search <query>` - Search for papers
+## Search Commands
+- `search <query>` - Search arXiv for papers
+- `library search <query>` - Semantic search in your saved papers
+- `similar to <number>` - Find papers similar to one from results
+
+## Analysis Commands
 - `show <number>` - Show details of paper from results
-- `summarize <number>` - Get AI summary of a paper
+- `summarize <number>` - Get AI summary of a paper (requires AI)
+- `compare <numbers>` - Compare multiple papers (e.g., "compare 1 2 3") (requires AI)
+
+## PDF Commands (NEW!)
+- `download <number>` - Download PDF for offline access
+- `fulltext <number>` - Extract and view full text from PDF
+- `search pdf <number> <query>` - Search for text within a PDF
+
+## Library Commands
+- `save <numbers>` - Save papers to your library (e.g., "save 1 2 3")
+- `library stats` - Show your library statistics
+
+## Settings
+- `citations on/off` - Enable/disable citation fetching
 - `help` - Show this help message
 - `exit` - Exit the chat
-
-## Coming Soon
-- `compare <id1> <id2>` - Compare two papers
-- `ask <question>` - Ask questions about papers
         """
         self.console.print(Panel(
             Markdown(help_text),
@@ -557,6 +600,308 @@ Your AI-powered physics research assistant. I can help you:
         except Exception as e:
             self.console.print(f"[red]Error finding similar papers:[/red] {str(e)}")
     
+    def _generate_simple_comparison(self, papers: List[Paper]) -> str:
+        """Generate a simple rule-based comparison as fallback"""
+        analysis = "**Overview:**\n"
+        analysis += f"Comparing {len(papers)} papers on related topics.\n\n"
+        
+        analysis += "**Papers:**\n"
+        for i, paper in enumerate(papers, 1):
+            year = paper.published.year if hasattr(paper.published, 'year') else str(paper.published)[:4]
+            citations = paper.citation_count if paper.citation_count > 0 else 0
+            analysis += f"{i}. *{paper.title[:60]}...* ({year}, {citations} citations)\n"
+        
+        analysis += "\n**Basic Comparison:**\n"
+        
+        # Compare by year
+        years = [p.published.year if hasattr(p.published, 'year') else int(str(p.published)[:4]) for p in papers]
+        if max(years) - min(years) > 2:
+            analysis += f"- Time span: {max(years) - min(years)} years ({min(years)}-{max(years)})\n"
+        
+        # Compare by citations
+        citations = [p.citation_count for p in papers]
+        if max(citations) > 0:
+            most_cited = papers[citations.index(max(citations))]
+            analysis += f"- Most cited: Paper {citations.index(max(citations)) + 1} ({max(citations)} citations)\n"
+        
+        # Common authors
+        all_authors = set()
+        for p in papers:
+            all_authors.update(p.authors)
+        analysis += f"- Total unique authors: {len(all_authors)}\n"
+        
+        analysis += "\n**Recommendation:**\n"
+        # Recommend reading order by year (oldest first for foundational)
+        oldest_idx = years.index(min(years))
+        analysis += f"Start with Paper {oldest_idx + 1} ({min(years)}) for foundational concepts.\n"
+        
+        return analysis
+    
+    def handle_compare(self, paper_numbers: str):
+        """Handle paper comparison command"""
+        if not self.use_llm or not self.llm:
+            self.console.print("[yellow]Paper comparison requires AI to be enabled[/yellow]")
+            self.console.print("[dim]Start with AI enabled or use --ai flag[/dim]")
+            return
+        
+        if not self.current_papers:
+            self.console.print("[yellow]No papers to compare. Search for papers first.[/yellow]")
+            return
+        
+        try:
+            # Parse paper numbers
+            numbers = [int(n.strip()) for n in paper_numbers.split()]
+            
+            if len(numbers) < 2:
+                self.console.print("[yellow]Please specify at least 2 papers to compare (e.g., 'compare 1 2')[/yellow]")
+                return
+            
+            if len(numbers) > 4:
+                self.console.print("[yellow]Comparing more than 4 papers at once may be slow. Using first 4...[/yellow]")
+                numbers = numbers[:4]
+            
+            # Validate paper numbers
+            papers_to_compare = []
+            for num in numbers:
+                if num < 1 or num > len(self.current_papers):
+                    self.console.print(f"[yellow]Invalid paper number: {num}[/yellow]")
+                    return
+                papers_to_compare.append(self.current_papers[num - 1])
+            
+            self.console.print(f"\n[cyan]🔍 Comparing {len(papers_to_compare)} papers with AI...[/cyan]\n")
+            
+            # Create comparison prompt with proper chat template
+            papers_info = ""
+            for i, paper in enumerate(papers_to_compare, 1):
+                authors_str = ', '.join(paper.authors[:3])
+                if len(paper.authors) > 3:
+                    authors_str += f" et al."
+                papers_info += f"Paper {i}:\n"
+                papers_info += f"Title: {paper.title}\n"
+                papers_info += f"Authors: {authors_str}\n"
+                # Limit abstract to avoid token overflow
+                abstract = paper.abstract[:400] if len(paper.abstract) > 400 else paper.abstract
+                papers_info += f"Abstract: {abstract}\n\n"
+            
+            # Use proper chat template format like in summarize_abstract
+            comparison_prompt = f"""<|system|>
+You are a research assistant helping to compare scientific papers. Provide clear, structured comparative analysis.
+</s>
+<|user|>
+Compare these {len(papers_to_compare)} research papers:
+
+{papers_info}
+
+Provide a comparative analysis with these sections:
+
+**Similarities:** What approaches or findings do these papers share?
+
+**Differences:** What unique contributions does each paper make?
+
+**Reading Order:** Which paper should be read first and why?
+
+**Relationship:** How do these papers relate to each other?
+
+Write a clear analysis:
+</s>
+<|assistant|>
+"""
+            
+            with self.console.status("[bold cyan]AI analyzing papers...", spinner="dots"):
+                response = self.llm.generate(
+                    comparison_prompt,
+                    max_tokens=1000,
+                    temperature=0.4
+                )
+            
+            # Clean up response - remove any prompt artifacts
+            response = response.strip()
+            # Remove common artifacts
+            for prefix in ["Write your analysis now:", "TASK:", "Here is", "Analysis:"]:
+                if response.startswith(prefix):
+                    response = response[len(prefix):].strip()
+            
+            # If response is suspiciously short or contains prompt text, provide fallback
+            if len(response) < 100 or any(x in response.lower() for x in ["provide a comparative", "covering:", "task:"]):
+                response = self._generate_simple_comparison(papers_to_compare)
+            
+            # Display comparison
+            self.console.print(Panel(
+                Markdown(f"## 📊 Comparative Analysis\n\n{response}"),
+                title=f"Comparison of {len(papers_to_compare)} Papers",
+                border_style="cyan",
+                box=box.ROUNDED
+            ))
+            
+            # Show side-by-side summary table
+            table = Table(title="Side-by-Side Summary", box=box.ROUNDED)
+            table.add_column("#", style="cyan", width=3)
+            table.add_column("Title", style="white", width=35)
+            table.add_column("Year", style="yellow", width=6)
+            table.add_column("Citations", style="green", width=10)
+            table.add_column("Authors", style="dim", width=25)
+            
+            for i, paper in enumerate(papers_to_compare, 1):
+                year = paper.published.year if hasattr(paper.published, 'year') else str(paper.published)[:4]
+                citations = str(paper.citation_count) if paper.citation_count > 0 else "-"
+                authors = ", ".join(paper.authors[:2])
+                if len(paper.authors) > 2:
+                    authors += " et al."
+                
+                table.add_row(
+                    str(i),
+                    paper.title[:35] + ("..." if len(paper.title) > 35 else ""),
+                    str(year),
+                    citations,
+                    authors
+                )
+            
+            self.console.print("\n")
+            self.console.print(table)
+            
+        except ValueError:
+            self.console.print(f"[red]Error:[/red] Invalid paper numbers. Use format: 'compare 1 2 3'")
+        except Exception as e:
+            self.console.print(f"[red]Error comparing papers:[/red] {str(e)}")
+    
+    def handle_download_pdf(self, paper_num: str):
+        """Handle PDF download command"""
+        if not self.current_papers:
+            self.console.print("[yellow]No papers to download. Search for papers first.[/yellow]")
+            return
+        
+        try:
+            num = int(paper_num)
+            if num < 1 or num > len(self.current_papers):
+                self.console.print(f"[yellow]Invalid paper number: {num}[/yellow]")
+                return
+            
+            paper = self.current_papers[num - 1]
+            
+            # Download PDF
+            pdf_path = self.pdf_processor.download_pdf(paper.pdf_url, paper.id)
+            
+            if pdf_path:
+                # Show metadata
+                metadata = self.pdf_processor.get_paper_metadata(pdf_path)
+                self.console.print(f"\n[green]✓[/green] PDF ready: {pdf_path.name}")
+                self.console.print(f"[dim]  Pages: {metadata.get('num_pages', 'unknown')}")
+                self.console.print(f"  Size: {metadata.get('size_kb', 0):.1f} KB[/dim]")
+            
+        except ValueError:
+            self.console.print(f"[red]Error:[/red] Invalid paper number")
+        except Exception as e:
+            self.console.print(f"[red]Error downloading PDF:[/red] {str(e)}")
+    
+    def handle_fulltext(self, paper_num: str):
+        """Handle full-text extraction and display"""
+        if not self.current_papers:
+            self.console.print("[yellow]No papers available. Search for papers first.[/yellow]")
+            return
+        
+        try:
+            num = int(paper_num)
+            if num < 1 or num > len(self.current_papers):
+                self.console.print(f"[yellow]Invalid paper number: {num}[/yellow]")
+                return
+            
+            paper = self.current_papers[num - 1]
+            
+            # Download if needed
+            safe_id = paper.id.replace('/', '_').replace(':', '_')
+            pdf_path = self.pdf_processor.cache_dir / f"{safe_id}.pdf"
+            
+            if not pdf_path.exists():
+                self.console.print(f"[cyan]Downloading PDF first...[/cyan]")
+                pdf_path = self.pdf_processor.download_pdf(paper.pdf_url, paper.id)
+                if not pdf_path:
+                    return
+            
+            # Extract sections
+            self.console.print(f"\n[cyan]Extracting text from PDF...[/cyan]")
+            sections = self.pdf_processor.extract_sections(pdf_path)
+            
+            if sections:
+                self.console.print(f"[green]✓[/green] Extracted {len(sections)} sections\n")
+                
+                for section_name, content in list(sections.items())[:5]:  # Show first 5 sections
+                    self.console.print(Panel(
+                        content[:500] + ("..." if len(content) > 500 else ""),
+                        title=f"📄 {section_name}",
+                        border_style="blue",
+                        box=box.ROUNDED
+                    ))
+                    self.console.print()
+                
+                if len(sections) > 5:
+                    self.console.print(f"[dim]... and {len(sections) - 5} more sections[/dim]\n")
+            else:
+                # Fallback: show first page
+                text = self.pdf_processor.extract_text(pdf_path, max_pages=1)
+                if text:
+                    self.console.print(Panel(
+                        text[:1000] + ("..." if len(text) > 1000 else ""),
+                        title="📄 First Page",
+                        border_style="blue"
+                    ))
+                
+        except ValueError:
+            self.console.print(f"[red]Error:[/red] Invalid paper number")
+        except Exception as e:
+            self.console.print(f"[red]Error extracting text:[/red] {str(e)}")
+    
+    def handle_search_pdf(self, args: str):
+        """Handle search within PDF"""
+        try:
+            parts = args.split('|')
+            if len(parts) != 2:
+                self.console.print("[yellow]Usage: search pdf <number> <query>[/yellow]")
+                return
+            
+            num = int(parts[0])
+            query = parts[1].strip()
+            
+            if not self.current_papers or num < 1 or num > len(self.current_papers):
+                self.console.print(f"[yellow]Invalid paper number: {num}[/yellow]")
+                return
+            
+            paper = self.current_papers[num - 1]
+            
+            # Download if needed
+            safe_id = paper.id.replace('/', '_').replace(':', '_')
+            pdf_path = self.pdf_processor.cache_dir / f"{safe_id}.pdf"
+            
+            if not pdf_path.exists():
+                self.console.print(f"[cyan]Downloading PDF first...[/cyan]")
+                pdf_path = self.pdf_processor.download_pdf(paper.pdf_url, paper.id)
+                if not pdf_path:
+                    return
+            
+            # Search
+            self.console.print(f"\n[cyan]🔍 Searching PDF for:[/cyan] '{query}'\n")
+            matches = self.pdf_processor.search_in_pdf(pdf_path, query, context_chars=150)
+            
+            if matches:
+                self.console.print(f"[green]✓[/green] Found {len(matches)} matches\n")
+                
+                for i, match in enumerate(matches[:10], 1):  # Show first 10 matches
+                    self.console.print(f"[cyan]Match {i}:[/cyan]")
+                    # Highlight the query in context
+                    context = match['context'].replace(query, f"[bold yellow]{query}[/bold yellow]")
+                    context = context.replace(query.lower(), f"[bold yellow]{query.lower()}[/bold yellow]")
+                    context = context.replace(query.upper(), f"[bold yellow]{query.upper()}[/bold yellow]")
+                    self.console.print(f"  {context}\n")
+                
+                if len(matches) > 10:
+                    self.console.print(f"[dim]... and {len(matches) - 10} more matches[/dim]")
+            else:
+                self.console.print(f"[yellow]No matches found for '{query}'[/yellow]")
+                
+        except ValueError:
+            self.console.print(f"[red]Error:[/red] Invalid paper number")
+        except Exception as e:
+            self.console.print(f"[red]Error searching PDF:[/red] {str(e)}")
+    
     def handle_library_stats(self):
         """Handle library statistics command"""
         self._initialize_vector_store()
@@ -641,6 +986,18 @@ Your AI-powered physics research assistant. I can help you:
                 
                 elif cmd == 'similar':
                     self.handle_similar(args)
+                
+                elif cmd == 'compare':
+                    self.handle_compare(args)
+                
+                elif cmd == 'download_pdf':
+                    self.handle_download_pdf(args)
+                
+                elif cmd == 'fulltext':
+                    self.handle_fulltext(args)
+                
+                elif cmd == 'search_pdf':
+                    self.handle_search_pdf(args)
                 
                 elif cmd == 'library_stats':
                     self.handle_library_stats()

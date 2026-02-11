@@ -9,10 +9,17 @@ A CLI-based research agent for deep literature research on physics topics using 
 ### 🔍 **Smart Literature Search**
 - Search 2M+ physics papers from arXiv
 - Citation metrics from Semantic Scholar (200M+ papers)
+- Google Scholar integration for broader coverage
 - Automatic ranking by citation count & influence
 - Influential citations marked with ⭐
 
-### 🧠 **Semantic Discovery** (NEW!)
+### 📊 **Paper Comparison** (NEW!)
+- **AI-powered side-by-side analysis** of 2-4 papers
+- Automatic identification of similarities and differences
+- Reading recommendations based on content analysis
+- Formatted comparison tables with metrics
+
+### 🧠 **Semantic Discovery**
 - **Vector search** powered by sentence-transformers
 - Build a personal research library with ChromaDB
 - Find similar papers by meaning, not keywords
@@ -21,6 +28,7 @@ A CLI-based research agent for deep literature research on physics topics using 
 ### 🤖 **Local AI Analysis**
 - TinyLlama (1.1B) for paper summaries - 100% offline!
 - Extract key findings automatically
+- Compare multiple papers with AI insights
 - No API costs, no token limits
 - Privacy-first: your research stays local
 
@@ -87,6 +95,24 @@ You: library stats
 Total Papers: 3
 ```
 
+**Compare Papers with AI:**
+```
+You: search quantum machine learning
+✓ Found 10 papers from arXiv
+
+You: compare 1 2 3
+📊 Comparative Analysis
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+[AI analysis of similarities, differences, and recommendations]
+
+Side-by-Side Summary
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+#  Title              Year  Citations  Authors
+1  Quantum Comp...    2023  45         Smith et al.
+2  Neural Nets...     2023  28         White et al.
+3  Hybrid Appr...     2024  12         Johnson et al.
+```
+
 **Semantic Discovery:**
 ```
 You: library search dark matter implications
@@ -113,6 +139,7 @@ The agent understands natural language:
 |---------|-------------|
 | `search <query>` | Search arXiv with citation rankings |
 | `show <number>` | View paper details |
+| `compare <numbers>` | Compare 2-4 papers with AI (e.g., "compare 1 2 3") |
 | `save <numbers>` | Save papers to library (e.g., "save 1 2 3") |
 | `library search <query>` | Semantic search in your saved papers |
 | `similar to <number>` | Find papers similar to one from results |
@@ -133,6 +160,11 @@ python -m deepsci.cli.main search "quantum mechanics" --limit 5
 # Get help
 python -m deepsci.cli.main --help
 ```
+
+**📖 See [NEW_FEATURES.md](docs/NEW_FEATURES.md) for detailed guide on:**
+- Paper comparison workflows
+- Google Scholar integration
+- Troubleshooting tips
 
 ## 🧠 How It Works
 

@@ -148,17 +148,34 @@ class ArxivClient:
         def fetch_citation(paper):
             """Fetch citation for a single paper"""
             try:
-                metrics = citation_client.get_citations_by_arxiv_id(paper.id)
+                # Pass paper title for Google Scholar fallback
+                metrics = citation_client.get_citations_by_arxiv_id(
+                    paper.id, 
+                    paper_title=paper.title,
+                    retry_count=1  # Reduce retries for parallel processing speed
+                )
                 if metrics:
                     paper.citation_count = metrics['citation_count']
                     paper.influential_citations = metrics['influential_citations']
-            except:
+            except Exception as e:
+                # Still fail gracefully but at least we tried harder
                 pass
             return paper
         
         # Use thread pool for parallel fetching
         with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
             papers = list(executor.map(fetch_citation, papers))
+        
+        # Print stats for debugging (optional)
+        if papers and citation_client.stats['total_attempts'] > 0:
+            success_rate = (citation_client.stats['semantic_scholar_success'] / 
+                          citation_client.stats['total_attempts'] * 100)
+            # Only show if there were issues
+            if success_rate < 80:
+                from rich.console import Console
+                console = Console()
+                console.print(f"[dim]  Citation fetch: {citation_client.stats['semantic_scholar_success']}/{citation_client.stats['total_attempts']} success, "
+                            f"{citation_client.stats['scholar_fallback_used']} from Scholar[/dim]")
         
         return papers
     
