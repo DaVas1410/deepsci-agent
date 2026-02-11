@@ -15,6 +15,7 @@ import re
 from deepsci.sources.arxiv_client import ArxivClient, Paper
 from deepsci.sources.citation_client import CitationClient
 from deepsci.llm.local_llm import LocalLLM, ModelDownloader
+from deepsci.search.vector_store import VectorStore
 from deepsci import __version__
 
 
@@ -62,6 +63,17 @@ class DeepSciChat:
             self.console.print("[yellow]Continuing without AI features...[/yellow]")
             self.use_llm = False
     
+    def _initialize_vector_store(self):
+        """Initialize vector store (lazy loading)"""
+        if self.vector_store is None:
+            try:
+                self.console.print("[cyan]Loading vector search...[/cyan]")
+                self.vector_store = VectorStore()
+                stats = self.vector_store.get_stats()
+                self.console.print(f"[green]✓[/green] Library loaded: {stats['total_papers']} papers")
+            except Exception as e:
+                self.console.print(f"[yellow]Warning: Could not load vector store: {str(e)}[/yellow]")
+    
     def show_welcome(self):
         """Display welcome message"""
         ai_status = "✓ AI Enabled" if (self.use_llm and self.llm) else "⊘ AI Disabled"
@@ -79,8 +91,11 @@ Your AI-powered physics research assistant. I can help you:
 **Quick Commands:**
 - `search <query>` - Search arXiv with citation rankings
 - `show <number>` - Show details of a paper from results
-- `summarize <number>` - Get AI summary of a paper {' 🤖' if self.use_llm else ' (requires AI)'}
-- `citations on/off` - Toggle citation fetching
+- `save <numbers>` - Save papers to your library (e.g., "save 1 2 3")
+- `library search <query>` - Semantic search in your saved papers
+- `similar to <number>` - Find papers similar to one from results
+- `library stats` - Show your library statistics
+- `summarize <number>` - Get AI summary {' 🤖' if self.use_llm else ' (requires AI)'}
 - `help` - Show all commands
 - `exit` - Exit the chat
 
@@ -88,7 +103,7 @@ Your AI-powered physics research assistant. I can help you:
 
 **Status:** {ai_status} | Citations: {'✓ Enabled' if self.fetch_citations else '⊘ Disabled'}
 
-**💡 Tip:** Citations are fetched in parallel for speed!
+**💡 Tip:** Build your personal research library with semantic search!
         """
         self.console.print(Panel(
             Markdown(welcome_text),
@@ -134,6 +149,24 @@ Your AI-powered physics research assistant. I can help you:
         if re.match(r'^summarize\s+(?:paper\s+)?(\d+)', lower_input):
             match = re.match(r'^summarize\s+(?:paper\s+)?(\d+)', lower_input)
             return 'summarize', match.group(1)
+        
+        # Save papers
+        if re.match(r'^save\s+([\d\s]+)', lower_input):
+            match = re.match(r'^save\s+([\d\s]+)', lower_input)
+            return 'save', match.group(1)
+        
+        # Library search
+        if lower_input.startswith('library search '):
+            return 'library_search', lower_input[15:].strip()
+        
+        # Similar papers
+        if re.match(r'^similar\s+(?:to\s+)?(\d+)', lower_input):
+            match = re.match(r'^similar\s+(?:to\s+)?(\d+)', lower_input)
+            return 'similar', match.group(1)
+        
+        # Library stats
+        if 'library stats' in lower_input or 'library status' in lower_input:
+            return 'library_stats', ''
         
         # Citations toggle
         if 'citations on' in lower_input:
@@ -360,6 +393,177 @@ Your AI-powered physics research assistant. I can help you:
         except Exception as e:
             self.console.print(f"[red]Error generating summary:[/red] {str(e)}")
     
+    def handle_save(self, paper_numbers: str):
+        """Handle save papers to library command"""
+        self._initialize_vector_store()
+        
+        if not self.vector_store:
+            self.console.print("[red]Error:[/red] Vector store not available")
+            return
+        
+        if not self.current_papers:
+            self.console.print("[yellow]No papers to save. Search for papers first.[/yellow]")
+            return
+        
+        try:
+            # Parse paper numbers
+            numbers = [int(n.strip()) for n in paper_numbers.split()]
+            
+            saved_count = 0
+            for num in numbers:
+                if num < 1 or num > len(self.current_papers):
+                    self.console.print(f"[yellow]Skipping invalid number: {num}[/yellow]")
+                    continue
+                
+                paper = self.current_papers[num - 1]
+                
+                # Check if already exists
+                if self.vector_store.paper_exists(paper.id):
+                    self.console.print(f"[dim]Paper {num} already in library[/dim]")
+                    continue
+                
+                # Convert Paper object to dict
+                paper_dict = {
+                    'id': paper.id,
+                    'title': paper.title,
+                    'abstract': paper.abstract,
+                    'authors': paper.authors,
+                    'year': paper.published.year if hasattr(paper, 'published') else '',
+                    'categories': getattr(paper, 'categories', []),
+                    'citation_count': getattr(paper, 'citation_count', 0),
+                    'url': getattr(paper, 'url', '')
+                }
+                
+                if self.vector_store.add_paper(paper_dict):
+                    saved_count += 1
+                    self.console.print(f"[green]✓[/green] Saved paper {num}: {paper.title[:60]}...")
+            
+            if saved_count > 0:
+                stats = self.vector_store.get_stats()
+                self.console.print(f"\n[cyan]Library now has {stats['total_papers']} papers[/cyan]")
+            
+        except ValueError:
+            self.console.print(f"[red]Error:[/red] Invalid paper numbers")
+        except Exception as e:
+            self.console.print(f"[red]Error saving papers:[/red] {str(e)}")
+    
+    def handle_library_search(self, query: str):
+        """Handle semantic search in library"""
+        self._initialize_vector_store()
+        
+        if not self.vector_store:
+            self.console.print("[red]Error:[/red] Vector store not available")
+            return
+        
+        stats = self.vector_store.get_stats()
+        if stats['total_papers'] == 0:
+            self.console.print("[yellow]Your library is empty. Save some papers first![/yellow]")
+            self.console.print("[dim]Use 'save <number>' after searching for papers[/dim]")
+            return
+        
+        self.console.print(f"\n[cyan]🔍 Searching your library ({stats['total_papers']} papers):[/cyan] {query}\n")
+        
+        try:
+            with self.console.status("[bold cyan]Semantic search...", spinner="dots"):
+                papers = self.vector_store.search(query, n_results=10)
+            
+            if papers:
+                self.console.print(f"[green]✓[/green] Found {len(papers)} relevant papers")
+                # Convert to compatible format for display
+                self.current_papers = [
+                    type('obj', (object,), p)() for p in papers
+                ]
+                self.display_papers(self.current_papers)
+            else:
+                self.console.print("[yellow]No matching papers found in your library[/yellow]")
+                
+        except Exception as e:
+            self.console.print(f"[red]Error:[/red] {str(e)}")
+    
+    def handle_similar(self, paper_num: str):
+        """Handle find similar papers command"""
+        self._initialize_vector_store()
+        
+        if not self.vector_store:
+            self.console.print("[red]Error:[/red] Vector store not available")
+            return
+        
+        if not self.current_papers:
+            self.console.print("[yellow]No papers to compare. Search for papers first.[/yellow]")
+            return
+        
+        try:
+            num = int(paper_num)
+            if num < 1 or num > len(self.current_papers):
+                self.console.print(f"[red]Error:[/red] Paper number must be between 1 and {len(self.current_papers)}")
+                return
+            
+            paper = self.current_papers[num - 1]
+            paper_id = paper.id if hasattr(paper, 'id') else None
+            
+            if not paper_id:
+                self.console.print("[red]Error:[/red] Could not get paper ID")
+                return
+            
+            # Check if paper is in library
+            if not self.vector_store.paper_exists(paper_id):
+                self.console.print(f"[yellow]Paper {num} not in library yet. Searching arXiv instead...[/yellow]")
+                # TODO: Could search arXiv for similar papers by keywords
+                self.console.print("[dim]Save papers to library first to use similarity search[/dim]")
+                return
+            
+            self.console.print(f"\n[cyan]Finding papers similar to:[/cyan] {paper.title[:60]}...\n")
+            
+            with self.console.status("[bold cyan]Finding similar papers...", spinner="dots"):
+                similar_papers = self.vector_store.find_similar(paper_id, n_results=10)
+            
+            if similar_papers:
+                self.console.print(f"[green]✓[/green] Found {len(similar_papers)} similar papers")
+                self.current_papers = [
+                    type('obj', (object,), p)() for p in similar_papers
+                ]
+                self.display_papers(self.current_papers)
+            else:
+                self.console.print("[yellow]No similar papers found in library[/yellow]")
+                
+        except ValueError:
+            self.console.print(f"[red]Error:[/red] Invalid paper number")
+        except Exception as e:
+            self.console.print(f"[red]Error finding similar papers:[/red] {str(e)}")
+    
+    def handle_library_stats(self):
+        """Handle library statistics command"""
+        self._initialize_vector_store()
+        
+        if not self.vector_store:
+            self.console.print("[red]Error:[/red] Vector store not available")
+            return
+        
+        stats = self.vector_store.get_stats()
+        
+        stats_text = f"""
+## 📚 Your Research Library
+
+**Total Papers:** {stats['total_papers']}
+
+**Embedding Model:** {stats.get('model', 'all-MiniLM-L6-v2')}
+
+**Vector Dimensions:** {stats.get('dimensions', 384)}
+
+**Capabilities:**
+- Semantic search by meaning
+- Find similar papers
+- Build research connections
+
+**Storage:** `./data/vectordb/`
+        """
+        
+        self.console.print(Panel(
+            Markdown(stats_text),
+            title="Library Statistics",
+            border_style="cyan"
+        ))
+    
     def run(self):
         """Main chat loop"""
         self.show_welcome()
@@ -399,6 +603,21 @@ Your AI-powered physics research assistant. I can help you:
                         self.console.print("[yellow]No papers to summarize. Search for papers first.[/yellow]")
                     else:
                         self.handle_summarize(args)
+                
+                elif cmd == 'save':
+                    self.handle_save(args)
+                
+                elif cmd == 'library_search':
+                    if not args:
+                        self.console.print("[yellow]Please provide a search query[/yellow]")
+                    else:
+                        self.handle_library_search(args)
+                
+                elif cmd == 'similar':
+                    self.handle_similar(args)
+                
+                elif cmd == 'library_stats':
+                    self.handle_library_stats()
                 
                 elif cmd == 'citations':
                     if args == 'on':
