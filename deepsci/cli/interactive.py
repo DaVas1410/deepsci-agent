@@ -26,6 +26,7 @@ class DeepSciChat:
         self.console = Console()
         self.arxiv_client = ArxivClient(max_results=10)
         self.citation_client = CitationClient()
+        self.vector_store = None  # Initialize lazily on first use
         self.conversation_history = []
         self.current_papers = []
         self.llm = None
