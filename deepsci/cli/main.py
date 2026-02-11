@@ -6,7 +6,11 @@ Main CLI entry point for DeepSci Agent
 import click
 from rich.console import Console
 from rich.panel import Panel
+from rich.table import Table
+from rich import box
 from deepsci import __version__
+from deepsci.sources.arxiv_client import ArxivClient
+from deepsci.cli.interactive import start_chat
 
 console = Console()
 
@@ -25,9 +29,54 @@ def cli():
 def search(query, sources, limit):
     """Search for physics papers across multiple sources"""
     console.print(Panel(f"[bold cyan]Searching for:[/bold cyan] {query}", title="DeepSci Search"))
-    console.print(f"[yellow]Sources:[/yellow] {', '.join(sources) if sources else 'all'}")
-    console.print(f"[yellow]Limit:[/yellow] {limit}")
-    console.print("\n[red]Note:[/red] Search functionality not yet implemented")
+    
+    # For now, only arXiv is implemented
+    if sources and 'arxiv' not in sources:
+        console.print("[yellow]Currently only arXiv is supported. Searching arXiv...[/yellow]\n")
+    
+    try:
+        arxiv_client = ArxivClient(max_results=limit)
+        
+        with console.status("[bold cyan]Searching arXiv...", spinner="dots"):
+            papers = arxiv_client.search(query, max_results=limit)
+        
+        if not papers:
+            console.print("[yellow]No papers found.[/yellow]")
+            return
+        
+        # Display results in a table
+        table = Table(
+            title=f"Found {len(papers)} papers",
+            box=box.ROUNDED,
+            show_header=True,
+            header_style="bold cyan"
+        )
+        
+        table.add_column("#", style="dim", width=3)
+        table.add_column("Title", style="bold", width=60)
+        table.add_column("Authors", style="green", width=30)
+        table.add_column("Year", style="blue", width=6)
+        
+        for idx, paper in enumerate(papers, 1):
+            authors = ", ".join(paper.authors[:2])
+            if len(paper.authors) > 2:
+                authors += f" et al."
+            
+            title = paper.title if len(paper.title) <= 60 else paper.title[:57] + "..."
+            
+            table.add_row(
+                str(idx),
+                title,
+                authors,
+                str(paper.published.year)
+            )
+        
+        console.print("\n")
+        console.print(table)
+        console.print(f"\n[dim]Use 'deepsci interactive' for a better research experience![/dim]")
+        
+    except Exception as e:
+        console.print(f"[red]Error:[/red] {str(e)}")
 
 
 @cli.command()
@@ -62,18 +111,8 @@ def ask(question):
 
 @cli.command()
 def interactive():
-    """Start interactive mode"""
-    console.print(Panel(
-        "[bold green]Welcome to DeepSci Agent![/bold green]\n\n"
-        "Available commands:\n"
-        "  • search <query>     - Search for papers\n"
-        "  • summarize <id>     - Summarize a paper\n"
-        "  • compare <id1> <id2> - Compare papers\n"
-        "  • ask <question>     - Ask a question\n"
-        "  • exit               - Exit interactive mode",
-        title=f"DeepSci Agent v{__version__}"
-    ))
-    console.print("\n[red]Note:[/red] Interactive mode not yet implemented")
+    """Start interactive chatbot mode"""
+    start_chat()
 
 
 if __name__ == '__main__':
