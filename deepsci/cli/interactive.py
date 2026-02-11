@@ -25,7 +25,6 @@ class DeepSciChat:
     def __init__(self, use_llm: bool = True):
         self.console = Console()
         self.arxiv_client = ArxivClient(max_results=10)
-        self.pubmed_client = PubMedClient()
         self.citation_client = CitationClient()
         self.conversation_history = []
         self.current_papers = []
