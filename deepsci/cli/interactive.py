@@ -78,18 +78,21 @@ Your AI-powered physics research assistant. I can help you:
 • **Answer** questions about physics topics
 
 **Quick Commands:**
-- `search <query>` - Search for papers (arXiv + PubMed)
+- `search <query>` - Search for papers (arXiv + PubMed) **FAST**
 - `search arxiv:<query>` - Search only arXiv
 - `search pubmed:<query>` - Search only PubMed
 - `show <number>` - Show details of a paper from results
 - `summarize <number>` - Get AI summary of a paper {' 🤖' if self.use_llm else ' (requires AI)'}
-- `citations on/off` - Toggle citation fetching
+- `citations on` - Enable citation metrics (slower but shows impact)
+- `citations off` - Disable citations (faster searches)
 - `help` - Show all commands
 - `exit` - Exit the chat
 
 **Just type naturally!** Try: *"find papers on quantum entanglement"*
 
 **Status:** {ai_status} | Citations: {'✓ Enabled' if self.fetch_citations else '⊘ Disabled'}
+
+**💡 Tip:** Citations are fetched in parallel for speed!
         """
         self.console.print(Panel(
             Markdown(welcome_text),
@@ -286,7 +289,7 @@ Your AI-powered physics research assistant. I can help you:
             
             # Search arXiv
             if source in ["all", "arxiv"]:
-                with self.console.status("[bold cyan]Searching arXiv...", spinner="dots"):
+                with self.console.status("[bold cyan]Searching arXiv and fetching citations...", spinner="dots"):
                     arxiv_papers = self.arxiv_client.search(
                         query, 
                         fetch_citations=self.fetch_citations

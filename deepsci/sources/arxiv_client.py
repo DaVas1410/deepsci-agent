@@ -131,7 +131,7 @@ class ArxivClient:
     
     def _enrich_with_citations(self, papers: List[Paper]) -> List[Paper]:
         """
-        Enrich papers with citation data from Semantic Scholar
+        Enrich papers with citation data from Semantic Scholar (PARALLEL)
         
         Args:
             papers: List of Paper objects
@@ -140,18 +140,25 @@ class ArxivClient:
             Papers with citation counts added
         """
         from deepsci.sources.citation_client import CitationClient
+        import concurrent.futures
+        from rich.progress import Progress, SpinnerColumn, TextColumn
         
         citation_client = CitationClient()
         
-        for paper in papers:
+        def fetch_citation(paper):
+            """Fetch citation for a single paper"""
             try:
                 metrics = citation_client.get_citations_by_arxiv_id(paper.id)
                 if metrics:
                     paper.citation_count = metrics['citation_count']
                     paper.influential_citations = metrics['influential_citations']
             except:
-                # Silently continue if citation lookup fails
                 pass
+            return paper
+        
+        # Use thread pool for parallel fetching
+        with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+            papers = list(executor.map(fetch_citation, papers))
         
         return papers
     
