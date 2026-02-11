@@ -10,10 +10,11 @@ DeepSci Agent is an interactive command-line tool that helps researchers explore
 
 - 🔍 **Multi-source search**: Query arXiv (PubMed, Google Scholar coming soon)
 - 💬 **Interactive chatbot**: Natural language interface in your terminal
-- 🤖 **Local AI**: Uses TinyML models for offline research assistance (coming soon)
-- 📚 **Semantic search**: Vector database for intelligent paper discovery (coming soon)
-- 📊 **Paper details**: View abstracts, authors, and metadata
+- 🤖 **Local AI summaries**: Uses TinyLlama (1.1B) for paper analysis - 100% offline!
+- 📚 **Paper details**: View abstracts, authors, and metadata
+- 🎯 **Smart summarization**: Extract key findings and methodologies
 - 🔗 **Citation tracking**: Build and explore citation graphs (coming soon)
+- 💾 **No API costs**: Everything runs locally on your machine
 
 ## Installation
 
