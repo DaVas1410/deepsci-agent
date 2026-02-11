@@ -8,13 +8,13 @@ DeepSci Agent is an interactive command-line tool that helps researchers explore
 
 ## Features
 
-- 🔍 **Multi-source search**: arXiv (2M papers) + PubMed (35M papers)
-- 📊 **Citation metrics**: Counts, rankings, and influential citations from Semantic Scholar
+- 🔍 **arXiv search**: Search 2M+ physics papers
+- 📊 **Citation metrics**: Rankings and influence scores from Semantic Scholar (200M+ papers)
 - 💬 **Interactive chatbot**: Natural language interface in your terminal
 - 🤖 **Local AI summaries**: Uses TinyLlama (1.1B) for paper analysis - 100% offline!
 - 📚 **Smart ranking**: Automatic sorting by citation count
-- 🎯 **Source selection**: Search specific sources or all at once
 - 🌟 **Impact metrics**: Influential citations marked with ⭐
+- ⚡ **Fast parallel fetching**: Citations retrieved in 3-5 seconds
 - 💾 **No API costs**: Everything runs locally on your machine
 
 ## Installation
@@ -43,9 +43,8 @@ python -m deepsci.cli.main interactive
 ```
 
 Then just chat naturally:
-- *"find papers on quantum entanglement"* - Searches all sources
-- *"search arxiv:dark matter"* - Search only arXiv
-- *"search pubmed:brain imaging"* - Search only PubMed  
+- *"find papers on quantum entanglement"* - Search arXiv with citations
+- *"search dark matter"* - Quick search
 - *"show 1"* - View paper details
 - *"summarize 1"* - Get AI-powered summary
 - *"citations off"* - Disable citations for faster searches

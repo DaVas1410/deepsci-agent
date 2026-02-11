@@ -13,7 +13,6 @@ from typing import List, Optional
 import re
 
 from deepsci.sources.arxiv_client import ArxivClient, Paper
-from deepsci.sources.pubmed_client import PubMedClient
 from deepsci.sources.citation_client import CitationClient
 from deepsci.llm.local_llm import LocalLLM, ModelDownloader
 from deepsci import __version__
@@ -72,19 +71,16 @@ class DeepSciChat:
 
 Your AI-powered physics research assistant. I can help you:
 
-• **Search** for papers across arXiv, PubMed, and more
+• **Search** arXiv for physics papers with citation metrics
 • **Summarize** research papers and extract key findings {' 🤖' if self.use_llm else ' (requires AI)'}
-• **Compare** multiple papers side-by-side
+• **Rank** papers by citation impact and influence
 • **Answer** questions about physics topics
 
 **Quick Commands:**
-- `search <query>` - Search for papers (arXiv + PubMed) **FAST**
-- `search arxiv:<query>` - Search only arXiv
-- `search pubmed:<query>` - Search only PubMed
+- `search <query>` - Search arXiv with citation rankings
 - `show <number>` - Show details of a paper from results
 - `summarize <number>` - Get AI summary of a paper {' 🤖' if self.use_llm else ' (requires AI)'}
-- `citations on` - Enable citation metrics (slower but shows impact)
-- `citations off` - Disable citations (faster searches)
+- `citations on/off` - Toggle citation fetching
 - `help` - Show all commands
 - `exit` - Exit the chat
 
@@ -272,76 +268,24 @@ Your AI-powered physics research assistant. I can help you:
         ))
     
     def handle_search(self, query: str):
-        """Handle search command with multi-source support"""
-        # Parse source prefix
-        source = "all"
-        if query.startswith("arxiv:"):
-            source = "arxiv"
-            query = query[6:].strip()
-        elif query.startswith("pubmed:"):
-            source = "pubmed"
-            query = query[7:].strip()
-        
-        self.console.print(f"\n[cyan]🔍 Searching {source}:[/cyan] {query}\n")
+        """Handle search command for arXiv"""
+        self.console.print(f"\n[cyan]🔍 Searching arXiv:[/cyan] {query}\n")
         
         try:
-            all_papers = []
+            with self.console.status("[bold cyan]Searching arXiv and fetching citations...", spinner="dots"):
+                papers = self.arxiv_client.search(
+                    query, 
+                    fetch_citations=self.fetch_citations
+                )
             
-            # Search arXiv
-            if source in ["all", "arxiv"]:
-                with self.console.status("[bold cyan]Searching arXiv and fetching citations...", spinner="dots"):
-                    arxiv_papers = self.arxiv_client.search(
-                        query, 
-                        fetch_citations=self.fetch_citations
-                    )
-                    all_papers.extend(arxiv_papers)
-                    if arxiv_papers:
-                        self.console.print(f"[green]✓[/green] Found {len(arxiv_papers)} papers from arXiv")
+            if papers:
+                # Sort by citations if available
+                if self.fetch_citations:
+                    papers.sort(key=lambda p: getattr(p, 'citation_count', 0), reverse=True)
+                
+                self.console.print(f"[green]✓[/green] Found {len(papers)} papers from arXiv")
             
-            # Search PubMed
-            if source in ["all", "pubmed"]:
-                with self.console.status("[bold cyan]Searching PubMed...", spinner="dots"):
-                    try:
-                        pubmed_papers = self.pubmed_client.search(query, max_results=5)
-                        
-                        # Convert PubMed papers to Paper objects for compatibility
-                        for pm_paper in pubmed_papers:
-                            # Try to fetch citations
-                            citation_count = 0
-                            influential_citations = 0
-                            if self.fetch_citations and pm_paper.doi:
-                                metrics = self.citation_client.get_citations_by_doi(pm_paper.doi)
-                                if metrics:
-                                    citation_count = metrics['citation_count']
-                                    influential_citations = metrics['influential_citations']
-                            
-                            # Create a pseudo-Paper object with PubMed data
-                            paper_obj = type('obj', (object,), {
-                                'id': pm_paper.pmid,
-                                'title': pm_paper.title,
-                                'authors': pm_paper.authors,
-                                'abstract': pm_paper.abstract,
-                                'published_date': pm_paper.published_date,
-                                'url': pm_paper.url,
-                                'citation_count': citation_count,
-                                'influential_citations': influential_citations,
-                                'source': 'pubmed',
-                                'journal': pm_paper.journal,
-                                'doi': pm_paper.doi
-                            })()
-                            
-                            all_papers.append(paper_obj)
-                        
-                        if pubmed_papers:
-                            self.console.print(f"[green]✓[/green] Found {len(pubmed_papers)} papers from PubMed")
-                    except Exception as e:
-                        self.console.print(f"[yellow]⚠[/yellow] PubMed search unavailable: {str(e)[:50]}")
-            
-            # Sort by citations if available
-            if self.fetch_citations and all_papers:
-                all_papers.sort(key=lambda p: getattr(p, 'citation_count', 0), reverse=True)
-            
-            self.display_papers(all_papers)
+            self.display_papers(papers)
             
         except Exception as e:
             error_msg = str(e)
