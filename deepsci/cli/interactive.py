@@ -18,6 +18,8 @@ from deepsci.sources.scholar_client import ScholarClient
 from deepsci.sources.pdf_processor import PDFProcessor
 from deepsci.llm.local_llm import LocalLLM, ModelDownloader
 from deepsci.search.vector_store import VectorStore
+from deepsci.analysis.citation_graph import CitationGraph
+from deepsci.analysis.graph_visualizer import GraphVisualizer
 from deepsci import __version__
 
 
@@ -30,6 +32,8 @@ class DeepSciChat:
         self.citation_client = CitationClient()
         self.scholar_client = ScholarClient()
         self.pdf_processor = PDFProcessor()
+        self.citation_graph = None  # Initialize on demand
+        self.graph_visualizer = GraphVisualizer()
         self.vector_store = None  # Initialize lazily on first use
         self.conversation_history = []
         self.current_papers = []
@@ -198,6 +202,22 @@ Your AI-powered physics research assistant. I can help you:
         if 'library stats' in lower_input or 'library status' in lower_input:
             return 'library_stats', ''
         
+        # Citation graph commands
+        if re.match(r'^graph\s+([\d\s]+)', lower_input):
+            match = re.match(r'^graph\s+([\d\s]+)', lower_input)
+            return 'graph', match.group(1)
+        if lower_input == 'graph':
+            return 'graph', 'all'
+        
+        # Seminal papers
+        if lower_input in ['seminal', 'seminal papers', 'influential']:
+            return 'seminal', ''
+        
+        # Citation path
+        if re.match(r'^path\s+(\d+)\s+(\d+)', lower_input):
+            match = re.match(r'^path\s+(\d+)\s+(\d+)', lower_input)
+            return 'path', f"{match.group(1)}|{match.group(2)}"
+        
         # Citations toggle
         if 'citations on' in lower_input:
             return 'citations', 'on'
@@ -324,10 +344,16 @@ Your AI-powered physics research assistant. I can help you:
 - `summarize <number>` - Get AI summary of a paper (requires AI)
 - `compare <numbers>` - Compare multiple papers (e.g., "compare 1 2 3") (requires AI)
 
-## PDF Commands (NEW!)
+## PDF Commands
 - `download <number>` - Download PDF for offline access
 - `fulltext <number>` - Extract and view full text from PDF
 - `search pdf <number> <query>` - Search for text within a PDF
+
+## Citation Network (NEW!)
+- `graph` - Build citation network for current papers
+- `graph <numbers>` - Build network for specific papers (e.g., "graph 1 2 3")
+- `seminal` - Identify most influential papers in network
+- `path <num1> <num2>` - Find citation path between two papers
 
 ## Library Commands
 - `save <numbers>` - Save papers to your library (e.g., "save 1 2 3")
@@ -935,6 +961,147 @@ Write a clear analysis:
             border_style="cyan"
         ))
     
+    def handle_graph(self, args: str):
+        """Handle citation graph visualization command"""
+        if not self.current_papers:
+            self.console.print("[yellow]No papers to graph. Search or add papers to library first.[/yellow]")
+            return
+        
+        try:
+            # Parse paper numbers
+            if args == 'all':
+                papers_to_graph = self.current_papers
+            else:
+                numbers = [int(n.strip()) for n in args.split()]
+                papers_to_graph = []
+                for num in numbers:
+                    if 1 <= num <= len(self.current_papers):
+                        papers_to_graph.append(self.current_papers[num - 1])
+                    else:
+                        self.console.print(f"[yellow]Warning:[/yellow] Paper #{num} not found, skipping")
+            
+            if not papers_to_graph:
+                self.console.print("[yellow]No valid papers selected.[/yellow]")
+                return
+            
+            # Extract arXiv IDs
+            arxiv_ids = []
+            for paper in papers_to_graph:
+                # Extract arxiv ID from paper.id or paper.entry_id
+                arxiv_id = paper.id.replace('http://arxiv.org/abs/', '').replace('https://arxiv.org/abs/', '')
+                arxiv_ids.append(arxiv_id)
+            
+            self.console.print(f"\n[cyan]🔗 Building citation network for {len(arxiv_ids)} papers...[/cyan]")
+            
+            # Initialize citation graph
+            from deepsci.analysis.citation_graph import CitationGraph
+            self.citation_graph = CitationGraph()
+            
+            # Build graph
+            graph = self.citation_graph.build_graph(arxiv_ids, include_references=True)
+            
+            # Show terminal visualization
+            self.graph_visualizer.visualize_terminal(graph, max_nodes=15)
+            
+            # Offer interactive visualization
+            if Confirm.ask("\nGenerate interactive HTML visualization?", default=True):
+                html_path = self.graph_visualizer.visualize_interactive(
+                    graph,
+                    self.citation_graph.paper_metadata,
+                    auto_open=True
+                )
+                if html_path:
+                    self.console.print(f"[green]✓[/green] Interactive graph: {html_path}")
+            
+        except ValueError:
+            self.console.print("[red]Error:[/red] Invalid paper numbers")
+        except Exception as e:
+            self.console.print(f"[red]Error building graph:[/red] {str(e)}")
+            import traceback
+            traceback.print_exc()
+    
+    def handle_seminal(self, args: str):
+        """Handle seminal papers identification"""
+        if not self.citation_graph or not self.citation_graph.graph:
+            self.console.print("[yellow]Please build a citation graph first using 'graph' command.[/yellow]")
+            return
+        
+        try:
+            seminal = self.citation_graph.find_seminal_papers(min_citations=10)
+            
+            if not seminal:
+                self.console.print("[yellow]No seminal papers found in the graph.[/yellow]")
+                return
+            
+            self.console.print("\n[bold cyan]🌟 Seminal Papers (Most Influential):[/bold cyan]\n")
+            
+            table = Table(show_header=True, header_style="bold magenta")
+            table.add_column("#", width=3)
+            table.add_column("Title", width=45)
+            table.add_column("Year", width=6)
+            table.add_column("Citations", justify="right", width=10)
+            table.add_column("Influential", justify="right", width=12)
+            table.add_column("In-Graph", justify="right", width=10)
+            table.add_column("Score", justify="right", width=10)
+            
+            for i, (arxiv_id, data) in enumerate(seminal[:10], 1):
+                title_short = data['title'][:42] + '...' if len(data['title']) > 45 else data['title']
+                table.add_row(
+                    str(i),
+                    title_short,
+                    str(data['year']),
+                    f"{data['citations']:,}",
+                    str(data['influential']),
+                    str(data['in_graph_citations']),
+                    f"{data['influence_score']:.0f}"
+                )
+            
+            self.console.print(table)
+            
+        except Exception as e:
+            self.console.print(f"[red]Error finding seminal papers:[/red] {str(e)}")
+    
+    def handle_path(self, args: str):
+        """Handle citation path finding"""
+        if not self.citation_graph or not self.citation_graph.graph:
+            self.console.print("[yellow]Please build a citation graph first using 'graph' command.[/yellow]")
+            return
+        
+        try:
+            parts = args.split('|')
+            from_num = int(parts[0].strip())
+            to_num = int(parts[1].strip())
+            
+            if not (1 <= from_num <= len(self.current_papers) and 1 <= to_num <= len(self.current_papers)):
+                self.console.print("[red]Error:[/red] Invalid paper numbers")
+                return
+            
+            from_paper = self.current_papers[from_num - 1]
+            to_paper = self.current_papers[to_num - 1]
+            
+            from_id = from_paper.id.replace('http://arxiv.org/abs/', '').replace('https://arxiv.org/abs/', '')
+            to_id = to_paper.id.replace('http://arxiv.org/abs/', '').replace('https://arxiv.org/abs/', '')
+            
+            path = self.citation_graph.find_citation_path(from_id, to_id)
+            
+            if path:
+                self.console.print(f"\n[green]✓[/green] Citation path found ({len(path)} papers):\n")
+                for i, arxiv_id in enumerate(path, 1):
+                    metadata = self.citation_graph.paper_metadata.get(arxiv_id, {})
+                    title = metadata.get('title', arxiv_id)
+                    title_short = title[:60] + '...' if len(title) > 60 else title
+                    
+                    if i < len(path):
+                        self.console.print(f"  {i}. {title_short}")
+                        self.console.print(f"     [dim]↓ cites[/dim]")
+                    else:
+                        self.console.print(f"  {i}. {title_short}")
+            else:
+                self.console.print(f"[yellow]No citation path found between these papers.[/yellow]")
+                
+        except Exception as e:
+            self.console.print(f"[red]Error finding path:[/red] {str(e)}")
+    
     def run(self):
         """Main chat loop"""
         self.show_welcome()
@@ -998,6 +1165,15 @@ Write a clear analysis:
                 
                 elif cmd == 'search_pdf':
                     self.handle_search_pdf(args)
+                
+                elif cmd == 'graph':
+                    self.handle_graph(args)
+                
+                elif cmd == 'seminal':
+                    self.handle_seminal(args)
+                
+                elif cmd == 'path':
+                    self.handle_path(args)
                 
                 elif cmd == 'library_stats':
                     self.handle_library_stats()

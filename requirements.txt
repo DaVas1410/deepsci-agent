@@ -24,6 +24,11 @@ lxml>=5.0.0
 # PDF processing
 PyMuPDF>=1.23.0
 
+# Graph visualization
+networkx>=3.0
+pyvis>=0.3.2
+matplotlib>=3.5.0
+
 # Development dependencies
 pytest>=7.4.0
 pytest-cov>=4.1.0

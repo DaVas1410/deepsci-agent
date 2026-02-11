@@ -5,5 +5,17 @@
       "year": 2023
     },
     "cached_at": "2026-02-11T13:39:13.541692"
+  },
+  "1706.03762": {
+    "data": {
+      "citation_count": 217637,
+      "influential_citations": 0,
+      "reference_count": 0,
+      "year": "2017",
+      "fields": [],
+      "venue": "Advances in neural \u2026",
+      "s2_fields": []
+    },
+    "cached_at": "2026-02-11T13:51:39.315002"
   }
 }
