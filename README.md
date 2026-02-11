@@ -2,7 +2,7 @@
 
 **Your AI-powered physics research assistant in the terminal**
 
-A comprehensive CLI-based research agent for deep literature research on physics topics. Features local AI models, semantic search, PDF processing, citation network visualization, and intelligent paper comparison. Built with a GitHub Copilot-style interface for researchers who live in the terminal.
+A comprehensive CLI-based research agent for deep literature research on physics topics. Features local AI models, semantic search, PDF processing, citation network visualization, and intelligent paper comparison. Built for use in the interface for researchers who live in the terminal.
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -654,7 +654,6 @@ MIT License - see [LICENSE](LICENSE) file for details.
 
 ## 🙏 Acknowledgments
 
-- Built with inspiration from **GitHub Copilot CLI**
 - Powered by open-source AI models:
   - [TinyLlama](https://github.com/jzhang38/TinyLlama) by Zhang et al.
   - [Sentence Transformers](https://www.sbert.net/) by UKP Lab
