@@ -200,7 +200,8 @@ Your AI-powered physics research assistant. I can help you:
             title=f"Found {len(papers)} papers",
             box=box.ROUNDED,
             show_header=True,
-            header_style="bold cyan"
+            header_style="bold cyan",
+            padding=(1, 2)  # Add vertical and horizontal padding
         )
         
         table.add_column("#", style="dim", width=3)
