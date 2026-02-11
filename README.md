@@ -20,32 +20,50 @@ DeepSci Agent is an interactive command-line tool that helps researchers explore
 
 ```bash
 # Clone the repository
-git clone https://github.com/YOUR_USERNAME/deepsci-agent.git
+git clone https://github.com/DaVas1410/deepsci-agent.git
 cd deepsci-agent
 
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+# Create conda environment
+conda create -n deep_sci python=3.10 -y
+conda activate deep_sci
 
 # Install dependencies
 pip install -r requirements.txt
 ```
 
-## Quick Start
+## Usage
+
+### Interactive Chat Mode (Recommended!)
+
+Start the interactive chatbot interface:
 
 ```bash
-# Start interactive mode
-python -m deepsci
-
-# Search for papers
-deepsci search "quantum entanglement"
-
-# Summarize a paper
-deepsci summarize arxiv:2301.12345
-
-# Compare papers
-deepsci compare arxiv:2301.12345 arxiv:2302.67890
+python -m deepsci.cli.main interactive
 ```
+
+Then just chat naturally:
+- *"find papers on quantum entanglement"*
+- *"search for dark matter research"*  
+- *"show 1"* (to see details of paper #1 from results)
+- *"summarize 1"* (to get AI-powered summary - requires model download on first use)
+- *"help"* for more commands
+
+### Command-Line Mode
+
+```bash
+# Search for papers
+python -m deepsci.cli.main search "quantum mechanics" --limit 5
+
+# Start without AI (faster startup)
+python -m deepsci.cli.main interactive --no-ai
+
+# Get help
+python -m deepsci.cli.main --help
+```
+
+### First-Time AI Setup
+
+On first use of AI features, TinyLlama (669MB) will be downloaded automatically. This only happens once!
 
 ## Requirements
 
