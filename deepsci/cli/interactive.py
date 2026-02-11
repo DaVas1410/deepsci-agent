@@ -1195,7 +1195,8 @@ Write a clear analysis:
                 self.console.print("\n[green]👋 Goodbye![/green]\n")
                 break
             except Exception as e:
-                self.console.print(f"\n[red]Error:[/red] {str(e)}")
+                from rich.markup import escape
+                self.console.print(f"\n[red]Error:[/red] {escape(str(e))}")
 
 
 def start_chat(use_llm: bool = True):

@@ -17,5 +17,146 @@
       "s2_fields": []
     },
     "cached_at": "2026-02-11T13:51:39.315002"
+  },
+  "2111.08018": {
+    "data": {
+      "citation_count": 155,
+      "influential_citations": 7,
+      "reference_count": 19,
+      "year": 2021,
+      "fields": [
+        "Physics"
+      ],
+      "venue": null,
+      "s2_fields": [
+        "Physics",
+        "Physics"
+      ]
+    },
+    "cached_at": "2026-02-11T14:32:27.289260"
+  },
+  "2512.10504": {
+    "data": {
+      "citation_count": 0,
+      "influential_citations": 0,
+      "reference_count": 27,
+      "year": 2025,
+      "fields": [
+        "Physics"
+      ],
+      "venue": null,
+      "s2_fields": [
+        "Physics",
+        "Physics",
+        "Computer Science"
+      ]
+    },
+    "cached_at": "2026-02-11T14:32:27.756858"
+  },
+  "1408.3420": {
+    "data": {
+      "citation_count": 82,
+      "influential_citations": 3,
+      "reference_count": 134,
+      "year": 2014,
+      "fields": [
+        "Physics"
+      ],
+      "venue": null,
+      "s2_fields": [
+        "Physics",
+        "Physics"
+      ]
+    },
+    "cached_at": "2026-02-11T14:32:28.995066"
+  },
+  "2103.14759": {
+    "data": {
+      "citation_count": 96,
+      "influential_citations": 0,
+      "reference_count": 0,
+      "year": "2023",
+      "fields": [],
+      "venue": "quantum",
+      "s2_fields": []
+    },
+    "cached_at": "2026-02-11T14:32:32.182403"
+  },
+  "1405.7816": {
+    "data": {
+      "citation_count": 36,
+      "influential_citations": 0,
+      "reference_count": 107,
+      "year": 2014,
+      "fields": [
+        "Physics"
+      ],
+      "venue": null,
+      "s2_fields": [
+        "Physics",
+        "Physics"
+      ]
+    },
+    "cached_at": "2026-02-11T14:33:00.069515"
+  },
+  "2004.13176": {
+    "data": {
+      "citation_count": 11,
+      "influential_citations": 0,
+      "reference_count": 0,
+      "year": "2021",
+      "fields": [],
+      "venue": "Quantum Information Processing",
+      "s2_fields": []
+    },
+    "cached_at": "2026-02-11T14:33:01.699844"
+  },
+  "0508197": {
+    "data": {
+      "citation_count": 9,
+      "influential_citations": 0,
+      "reference_count": 0,
+      "year": "2006",
+      "fields": [],
+      "venue": "International Journal of \u2026",
+      "s2_fields": []
+    },
+    "cached_at": "2026-02-11T14:33:03.883665"
+  },
+  "1705.00365": {
+    "data": {
+      "citation_count": 13,
+      "influential_citations": 0,
+      "reference_count": 0,
+      "year": "2019",
+      "fields": [],
+      "venue": "npj Quantum \u2026",
+      "s2_fields": []
+    },
+    "cached_at": "2026-02-11T14:33:04.212656"
+  },
+  "2203.13547": {
+    "data": {
+      "citation_count": 10,
+      "influential_citations": 0,
+      "reference_count": 0,
+      "year": "2022",
+      "fields": [],
+      "venue": "Quantum",
+      "s2_fields": []
+    },
+    "cached_at": "2026-02-11T14:33:05.902985"
+  },
+  "2107.11259": {
+    "data": {
+      "citation_count": 27,
+      "influential_citations": 0,
+      "reference_count": 0,
+      "year": "2021",
+      "fields": [],
+      "venue": "Quantum Information Processing",
+      "s2_fields": []
+    },
+    "cached_at": "2026-02-11T14:34:11.026856"
   }
 }

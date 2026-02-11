@@ -680,26 +680,6 @@ If you find DeepSci Agent useful, please consider giving it a ⭐ on GitHub!
 
 ---
 
-## 📸 Screenshots
-
-### Interactive Citation Network
-![Citation Network](docs/images/citation_network.png)
-*Interactive HTML visualization with hover tooltips, zoom, and pan*
-
-### Paper Comparison
-![Paper Comparison](docs/images/comparison.png)
-*AI-powered side-by-side analysis with structured insights*
-
-### PDF Full-Text Search
-![PDF Search](docs/images/pdf_search.png)
-*Search within PDFs with context highlighting*
-
-### Terminal Interface
-![Terminal UI](docs/images/terminal.png)
-*Beautiful, intuitive command-line interface*
-
----
-
 ## ❓ FAQ
 
 **Q: Do I need an API key?**  
